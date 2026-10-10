@@ -2,7 +2,7 @@
 
 2026-10-11
 
-**狀態：已實作，尚未部署（2026-10-11）。** 六個實作項目都完成，本機 emulator 測試通過（後端 48 項、PC 腳本新舊版 14 項），三燈 code review 的修正已套用。網頁還沒在瀏覽器實際操作過，`version.py` 也還沒升版。實作與規劃的差異見文末「實作紀錄」。
+**狀態：已上線（2026-10-11）。** 後端、網頁、PC 1.1.0 都已依序部署，部署後檢查正常。本機 emulator 測試通過（後端 48 項、PC 腳本新舊版 14 項），三燈 code review 的修正已套用。還沒在正式環境實際刷卡續訂過，網頁也還沒在瀏覽器完整操作過。實作與規劃的差異見文末「實作紀錄」。
 
 ## 目標
 
@@ -293,8 +293,18 @@ if (data.orderType === 'renewal') {
 
 整合測試放在 `mlevelweb/scripts/renew-test.cjs`，用法見 `local-ecpay-test-plan.md` 的「自動化：續訂功能整合測試」。PC 端測試沒有放進 repo：它需要把舊版 `license_gate.py` 從 git 取出來比對，而且要改 `LOCALAPPDATA`，比較適合照測試清單手動測。
 
+### 部署紀錄（2026-10-11）
+
+| 順序 | 項目 | 結果 |
+| --- | --- | --- |
+| 1 | functions（`mlevelweb` `2f69576`） | revision `ecpayapi-00017-niy`。`GET /` 出現 `POST /renew`；`/renew`、`/order` 沒帶 App Check 回 401；`/verify` 仍回 426；`/session/acquire`、`/session/heartbeat` 行為不變；log 無錯誤 |
+| 2 | 網頁 Hosting | 打包檔 `index-B8RC9ouX.js` 指向正式 API、沒有本機網址，含續訂功能；CSP `connect-src` 允許 Functions 網域 |
+| 3 | PC 1.1.0（`mlevel` `b44e802`） | `releases/latest.json` 為 1.1.0；`releases/mlevel-1.1.0-update.zip`、`mlevel.zip` 的 MD5 與本機一致，更新包 SHA-256 與 `latest.json` 相同；沒有設 `minVersion`（只提示、不強制） |
+
+第一次發版時 `build.ps1` 在繁中 Windows（主控台 cp950）讀 gcloud 輸出失敗：線上 `latest.json` 的中文 notes 被讀成亂碼，`ConvertFrom-Json` 中止（沒有上傳任何東西）。已修正為呼叫 gcloud 期間暫時切成 UTF-8（`mlevel` `13325fd`），重發成功。
+
 ### 尚未完成
 
-- [ ] 在瀏覽器實際操作網頁（找回授權 → 續訂 → 綠界測試站刷卡 → 續訂完成畫面、`#renew=` 帶入金鑰、手機寬度）
-- [ ] `version.py` 升到 1.1.0、打包並上傳更新包
-- [ ] 依部署順序上線：後端 → 網頁 → PC 1.1.0
+- [ ] 在正式環境用自己的金鑰實際續訂一次（付款 → 「續訂完成，金鑰不變」→ 到期日延長 30 天；`firebase functions:log` 有 `License renewed`）
+- [ ] 在瀏覽器完整操作網頁（到期結果頁 → 續訂時背景不可捲動、`#renew=` 帶入金鑰、手機寬度的頁尾入口）
+- [ ] `firebase-functions` 套件升級（部署時 CLI 提示版本過舊；升級後要重跑 `scripts/renew-test.cjs`）
