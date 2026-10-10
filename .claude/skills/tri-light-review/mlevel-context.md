@@ -29,6 +29,8 @@
 | `POST /session/acquire` | PC 腳本 | | body：`licenseKey, deviceId, deviceLabel, force` |
 | `POST /session/heartbeat` | PC 腳本 | | body：`licenseKey, sessionId`；409 = 席位被搶 |
 | `POST /session/release` | PC 腳本 | | 失敗被用戶端忽略 |
+| `POST /update/check` | PC 腳本（1.0.0 起，自動更新） | | body：`licenseKey, sessionId, version`；要有成立中的租約（`checkSessionLease`，和心跳同一套）。**刻意不回 `valid`**：用戶端以 `require_valid=False` 呼叫、看 `ok` 判斷，不會把付費用戶誤判成無效 |
+| `POST /update/download` | PC 腳本（1.0.0 起） | | body：`licenseKey, sessionId`；回 Storage 短效網址與 `sha256`。同樣不回 `valid` |
 | `GET/HEAD /download` | 網頁（`/order`、`/lookup` 回傳的 `downloadUrl`、`manualUrl`） | | query：`orderId, token, file`（`app`／`manual`） |
 
 App Check 是否真的阻擋請求，取決於 `functions/.env` 的 `MLEVEL_APPCHECK_ENFORCE`（`index.js:262`）；未開啟時只記 log。評估「繞過網頁直接打 API」的風險時要考慮這點。
@@ -84,6 +86,8 @@ App Check 是否真的阻擋請求，取決於 `functions/.env` 的 `MLEVEL_APPC
 - 打包版啟動時會 `os.chdir` 到 exe 所在資料夾，設定裡的模板路徑是相對路徑
 - `templates/`、`maps/`、`monster/` 等資源檔的路徑直接寫在使用者設定裡（例如 `monster/blue-snail.png`），不可改名或搬移
 - **更新流程**：zip 內含 `config/`（`build.ps1:61-69`），舊用戶解壓覆蓋會蓋掉自己的設定與路線。任何調整打包內容的變更，都要確認不會覆蓋使用者既有的 `config/`、`maps/`；使用手冊目前沒有更新步驟，需確認
+- **自動更新（1.0.0 起）**：更新包 `mlevel-<ver>-update.zip` 只含 `mlevel.exe`、`_internal`、`mlevel-updater.exe` 與 `defaults/`（monster、templates；maps 不放，地圖清單在 routes.json，補圖沒用）。
+  `updater.py` 只用 `defaults/` 補使用者缺的檔案，不覆蓋；`config/`、`log/` 永遠不碰。改更新包格式時，要確認已裝 1.0.0 的 updater 還能處理新的包（updater 是跟著舊版一起出貨、由舊版啟動的）
 
 ### 6. 安全常數
 
