@@ -25,6 +25,7 @@
 | `GET/POST /result` | **綠界導回瀏覽器**（OrderResultURL） | | |
 | `GET /order` | 網頁 | ✔ | |
 | `POST /lookup` | 網頁 | ✔ | 找回授權 |
+| `POST /renew` | 網頁 | ✔ | 續訂：body `email, licenseKey`，回傳格式同 `/create` 另加 `currentExpiresAt`。續訂訂單 `orderType: 'renewal'`、`licenseKey` 必須是空字串（金鑰存 `renewsLicenseKey`），付款後由 `applyRenewal` 延長**原始訂單**的 `licenseExpiresAt` |
 | `POST /verify` | **舊版 PC 腳本**的啟動檢查（`index.js:58`），不佔席位 | | 不可移除或改回應格式；唯一例外是業主啟用 `MLEVEL_REQUIRE_SESSION=true`，讓它回 `426 UPGRADE_REQUIRED`（見 SKILL.md「有規劃的淘汰」） |
 | `POST /session/acquire` | PC 腳本 | | body：`licenseKey, deviceId, deviceLabel, force` |
 | `POST /session/heartbeat` | PC 腳本 | | body：`licenseKey, sessionId`；409 = 席位被搶 |
@@ -67,6 +68,7 @@ App Check 是否真的阻擋請求，取決於 `functions/.env` 的 `MLEVEL_APPC
 ### 4. Firestore
 
 - 集合：`mlevel_orders`（訂單、金鑰、email、accessToken）、`mlevel_sessions`（席位租約）
+- 金鑰的到期日只存在**原始訂單**（`licenseKey` 欄位等於該金鑰的那張）上；續訂訂單的 `licenseKey` 一律空字串，否則 `findPaidOrder` 可能撈到續訂訂單。`mlevel_sessions.licenseExpiresAt` 是副本，續訂時同步更新，心跳判定到期前也會回頭查訂單（`refreshSessionExpiry`）
 - `firestore.rules` 全部拒絕前端存取，只能透過 Functions（Admin SDK）存取——**不可放寬**
 - 欄位只增不刪；讀取時要處理舊文件缺少新欄位的情況（不可假設欄位一定存在）
 - 新增需要的查詢要同步更新 `firestore.indexes.json`
