@@ -158,6 +158,10 @@ python mlevel.py
 | 9 | 關掉 PC 腳本 | 租約被釋放 |
 | 10 | 檢查 `%LOCALAPPDATA%\mlevel\license.json`（原本的路徑） | 內容沒有被測試金鑰覆蓋 |
 
+### 自動化：續訂功能整合測試
+
+emulator 啟動後，在 `mlevelweb/` 執行 `node scripts/renew-test.cjs`。腳本自己簽綠界回呼，跑完新購、續訂、冪等、異常回呼、席位與下載共 48 項。它只連 `127.0.0.1`，`functions/.env.local` 的結帳網址不是 `payment-stage` 時直接中止。動到 `markOrderPaid`、席位或 `/download` 時重跑一次。
+
 ## 風險與檢查
 
 | 風險 | 後果 | 防範 |

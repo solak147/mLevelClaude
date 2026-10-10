@@ -2,7 +2,7 @@
 
 2026-10-11
 
-**狀態：已實作，尚未部署（2026-10-11）。** 六個實作項目都完成，本機 emulator 測試通過（後端 42 項、PC 腳本新舊版 14 項）。網頁還沒在瀏覽器實際操作過，`version.py` 也還沒升版。實作與規劃的差異見文末「實作紀錄」。
+**狀態：已實作，尚未部署（2026-10-11）。** 六個實作項目都完成，本機 emulator 測試通過（後端 48 項、PC 腳本新舊版 14 項），三燈 code review 的修正已套用。網頁還沒在瀏覽器實際操作過，`version.py` 也還沒升版。實作與規劃的差異見文末「實作紀錄」。
 
 ## 目標
 
@@ -279,6 +279,19 @@ if (data.orderType === 'renewal') {
 - **頁尾也加了「續訂」**：頁首的選單在 720px 以下會隱藏，手機只能從頁尾進入
 - **主程式執行中到期**：除了授權視窗，主視窗的「授權已失效」也改成問「要現在打開官網續訂嗎？」
 - `/download` 遇到找不到原始訂單的續訂連結，回 404 `LICENSE_NOT_FOUND`（新的錯誤代碼，只出現在 HTML 錯誤頁）
+- **收了錢卻續不上時，在續訂訂單寫 `renewalError`**（`MISSING_REFERENCE`／`TARGET_MISMATCH`／`NO_EXPIRY`）、`renewalErrorAt`、`transactionId`、`ecpayRawResult`，訂單仍是 `pending`。客服在 Firestore 查 `renewalError` 就能找出這些訂單。
+  `/notify` 已經回 `1|OK`，綠界**不會重送**；我們也不存 `CheckMacValue`，沒辦法重打回呼（自己用正式 HashKey 簽一份等於偽造綠界通知，不可以這樣做）。所以要人工處理：
+  1. 先到綠界後台用 `transactionId` 確認款項確實入帳
+  2. 找到原始訂單（`licenseKey` 等於續訂訂單的 `renewsLicenseKey`），把 `licenseExpiresAt` 設成 `max(現在, 原到期日) + 30 天`，`renewalCount` 加 1，`lastRenewedAt` 設成現在，`lastRenewalOrderId` 設成續訂訂單編號
+  3. 續訂訂單改成 `status: 'paid'`，補上 `paidAt`、`previousExpiresAt`、`renewedExpiresAt`，刪掉 `renewalError`、`renewalErrorAt`
+  4. 席位文件（`mlevel_sessions`，文件 ID 是金鑰的雜湊）的 `licenseExpiresAt` 建議一起改成新日期。沒改也不會中斷使用：等席位上的舊到期日過了，下一次心跳就會由 `refreshSessionExpiry` 從原始訂單同步；只是在那之前，程式顯示的還是舊日期
+
+  程式裡清掉 `renewalError` 的分支只在一種情況會走到：`/notify` 續不上之後，使用者的 `/result` 才進來，而且資料剛好已經修好。
+- 到期訊息改成「完成後用這組金鑰重新驗證即可」，新版（保留金鑰）和舊版（清掉金鑰）都說得通
+
+### 測試
+
+整合測試放在 `mlevelweb/scripts/renew-test.cjs`，用法見 `local-ecpay-test-plan.md` 的「自動化：續訂功能整合測試」。PC 端測試沒有放進 repo：它需要把舊版 `license_gate.py` 從 git 取出來比對，而且要改 `LOCALAPPDATA`，比較適合照測試清單手動測。
 
 ### 尚未完成
 
