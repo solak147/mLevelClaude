@@ -32,6 +32,8 @@
 | `POST /session/release` | PC 腳本 | | 失敗被用戶端忽略 |
 | `POST /update/check` | PC 腳本（1.0.0 起，自動更新） | | body：`licenseKey, sessionId, version`；要有成立中的租約（`checkSessionLease`，和心跳同一套）。**刻意不回 `valid`**：用戶端以 `require_valid=False` 呼叫、看 `ok` 判斷，不會把付費用戶誤判成無效 |
 | `POST /update/download` | PC 腳本（1.0.0 起） | | body：`licenseKey, sessionId`；回 Storage 短效網址與 `sha256`。同樣不回 `valid` |
+| `POST /payment-info` | **綠界伺服器**（超商代碼 PaymentInfoURL） | | 驗章後存繳費代碼（`RtnCode=10100073` 是取號成功，不是失敗）；回純文字 `1\|OK`，驗章失敗 `0\|...`。訂單仍 pending，金鑰等 `/notify` 才發 |
+| `GET/POST /payment-info/return` | **綠界導回瀏覽器**（超商代碼 ClientRedirectURL） | | 同上存繳費代碼，導回 `/?orderId&status=cvs_pending&token`；驗章沒過不給 token |
 | `GET/HEAD /download` | 網頁（`/order`、`/lookup` 回傳的 `downloadUrl`、`manualUrl`） | | query：`orderId, token, file`（`app`／`manual`） |
 
 App Check 是否真的阻擋請求，取決於 `functions/.env` 的 `MLEVEL_APPCHECK_ENFORCE`（`index.js:262`）；未開啟時只記 log。評估「繞過網頁直接打 API」的風險時要考慮這點。
@@ -67,7 +69,8 @@ App Check 是否真的阻擋請求，取決於 `functions/.env` 的 `MLEVEL_APPC
 
 ### 4. Firestore
 
-- 集合：`mlevel_orders`（訂單、金鑰、email、accessToken）、`mlevel_sessions`（席位租約）
+- 集合：`mlevel_orders`（訂單、金鑰、email、accessToken）、`mlevel_sessions`（席位租約）、`mlevel_mail_outbox`（付款成功寄信排程，文件 id `{訂單}_paid`，由 `markOrderPaid`／`applyRenewal` 在同一個交易建立，`sendOrderMail` 觸發器寄出；只放訂單編號與種類，不放金鑰）
+- `/create`、`/renew` 的 `paymentMethod` 只認 `'cvs'`，其他值（含舊網頁沒帶）一律信用卡，信用卡結帳表單欄位不可變動
 - 金鑰的到期日只存在**原始訂單**（`licenseKey` 欄位等於該金鑰的那張）上；續訂訂單的 `licenseKey` 一律空字串，否則 `findPaidOrder` 可能撈到續訂訂單。`mlevel_sessions.licenseExpiresAt` 是副本，續訂時同步更新，心跳判定到期前也會回頭查訂單（`refreshSessionExpiry`）
 - `firestore.rules` 全部拒絕前端存取，只能透過 Functions（Admin SDK）存取——**不可放寬**
 - 欄位只增不刪；讀取時要處理舊文件缺少新欄位的情況（不可假設欄位一定存在）
