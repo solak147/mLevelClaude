@@ -85,7 +85,7 @@ App Check 是否真的阻擋請求，取決於 `functions/.env` 的 `MLEVEL_APPC
 | `auto_hunt_config.json` | 打包版：`<exe 所在資料夾>\config\`（`mlevel.py:51`）；原始碼版：`mlevel/config/` | 使用者設定；新增欄位要有預設值，讀到舊版檔案不可報錯 |
 | `routes.json` | 同上 | 有 `ROUTE_FILE_VERSION`（目前 3）；格式變更要遞增版本並提供舊版遷移 |
 | `rope_memory.json` | 同上 | 同上：缺欄位用預設值、無法解析時不可崩潰 |
-| `visual_trigger_settings.json` | 舊程式 `desktop_visual_trigger.py` 專用，不出貨（`build.ps1:67`） | 不屬於產品契約 |
+| `visual_trigger_settings.json` | 舊程式 `desktop_visual_trigger.py` 專用，不出貨（`build.ps1:175`） | 不屬於產品契約 |
 | `ngm_relay.ps1`、`ngm_armed.txt`、`ngm_request.txt` | `%LOCALAPPDATA%\mlevel\`（斷線重連「轉接啟動」，`reconnect.py`） | `ngm_armed.txt` 是「期限（Unix 秒）\n擁有者 PID\n行程名稱」，腳本確認擁有者行程還在、名稱相同才轉交；舊版腳本由 `refresh_relay()` 自動換新。腳本刻意放在程式資料夾外，使用者刪掉 mlevel 後仍照原樣開 NGM |
 | `HKCU\Software\Classes\ngm` | 登錄（轉接啟動） | 只刪自己裝的那一筆（指向 `ngm_relay.ps1` 的），HKLM 原本的設定永遠不動；腳本不見、只剩登錄時，取消勾選也要能刪 |
 
@@ -95,7 +95,7 @@ App Check 是否真的阻擋請求，取決於 `functions/.env` 的 `MLEVEL_APPC
 - `config_file()`（`mlevel.py:85`）會把舊版放在根目錄的設定檔自動搬進 `config/`，這段遷移邏輯不可移除
 - 打包版啟動時會 `os.chdir` 到 exe 所在資料夾，設定裡的模板路徑是相對路徑
 - `templates/`、`maps/`、`monster/` 等資源檔的路徑直接寫在使用者設定裡（例如 `monster/blue-snail.png`），不可改名或搬移
-- **更新流程**：zip 內含 `config/`（`build.ps1:61-69`），舊用戶解壓覆蓋會蓋掉自己的設定與路線。任何調整打包內容的變更，都要確認不會覆蓋使用者既有的 `config/`、`maps/`；使用手冊目前沒有更新步驟，需確認
+- **更新流程**：完整安裝包 `mlevel-<ver>.zip` 內含 `config/`（`build.ps1:172`，只去掉 `*.bak` 與 `visual_trigger_settings.json`，`build.ps1:174-175`），舊用戶手動解壓覆蓋會蓋掉自己的設定與路線。任何調整打包內容的變更，都要確認不會覆蓋使用者既有的 `config/`、`maps/`；使用手冊目前沒有更新步驟，需確認
 - **自動更新（1.0.0 起）**：更新包 `mlevel-<ver>-update.zip` 只含 `mlevel.exe`、`_internal`、`mlevel-updater.exe` 與 `defaults/`（monster、templates；maps 不放，地圖清單在 routes.json，補圖沒用）。
   `updater.py` 只用 `defaults/` 補使用者缺的檔案，不覆蓋；`config/`、`log/` 永遠不碰。改更新包格式時，要確認已裝 1.0.0 的 updater 還能處理新的包（updater 是跟著舊版一起出貨、由舊版啟動的）
 
