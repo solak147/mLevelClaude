@@ -174,7 +174,8 @@ x 範圍 = player_x ± (reach_x + monster_margin)
 
 - 每幀都會先 `release_all()`，冷卻中也一樣。舊版在冷卻期間沒放開方向鍵，角色會邊揮邊走過頭。
 - 冷卻 `attack_cooldown`（0.45 秒）到了才出手：先轉向目標，再按 `attack_key`；MP 不足時改按 `fallback_attack_key`，按住 `attack_hold_seconds`。
-- log：`Attack <怪名> dx=… dy=… key=… range=…x…`，其中 dy 是相對高度中心的值，正常會在 0 附近。
+- **準時出手：** 冷卻只在每輪檢查一次，所以舊版的攻擊間隔一定是每輪時間（約 210ms）的整數倍，會在 0.46 和 0.63 秒之間跳動，看起來像偶爾卡一下。現在如果冷卻剩下的時間比一輪短（用每輪時間的移動平均 `frame_ema` 判斷），就在這一輪等到冷卻結束再出手。模擬結果：平均間隔從約 0.58 秒變成 0.45 秒，標準差從 64–87ms 降到 6ms 以內。
+- log：`Attack <怪名> dx=… dy=… key=… range=…x… gap=…ms wait=…ms`。dy 是相對高度中心的值，正常會在 0 附近。gap 是距離上一下攻擊的時間，wait 是這一下為了等冷卻在這一輪多等的時間；兩下相隔超過 2 秒就不印 gap/wait。
 
 ### 6.1 MP 備用攻擊（`_update_attack_mode`，2726）
 
