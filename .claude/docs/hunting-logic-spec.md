@@ -212,6 +212,7 @@ x 範圍 = player_x ± (reach_x + monster_margin)
 | `direction_hold_seconds` | 0.4 | — | 走向怪物時，至少維持同一方向多久才能轉向 |
 | `route_chase` / `route_clear_first` | 關 / 關 | 路線 | 第 4 節 |
 | `route_clear_seconds` / `route_leash` | 20 / 2 | 路線 | 清場時間上限／脫離路線上限（小地圖 px） |
+| `late_engage_capture` | 關 | 行為 | 近距離才開打時存前一幀到 `log/late_engage/`（除錯用） |
 
 新增欄位都有預設值，舊設定檔可以直接讀。驗證規則在 `_collect()`（`attack_range_up` 不可為負數）。
 
@@ -231,7 +232,7 @@ x 範圍 = player_x ± (reach_x + monster_margin)
 | 寬限期加長到 0.8 秒 | 重新開打比例沒變（18% → 17%），殺完怪停頓更久 | 退回 0.45 秒 |
 | 寬限期間先撿物 | 縮短殺完最後一隻後的停頓 | 保留 |
 
-**診斷方法：** 開打時怪物距離小於 `LATE_ENGAGE_PX`（60px），就把前一幀存成 `log/late_engage/<時間>_<序號>_<怪名>_p<x>x<y>.png`，每場最多 10 張（`_dump_late_engage`，3002）。之後用 `mlevel` 自己的比對函式離線重跑這些圖，就能確認是「沒比對到」、「被高度判定濾掉」還是「錨點不對」。
+**診斷方法：** 在 GUI「行為」勾選「近距離才開打時存前一幀到 log/late_engage」（設定鍵 `late_engage_capture`，預設關）。開啟後，開打時怪物距離小於 `LATE_ENGAGE_PX`（60px），就把前一幀存成 `log/late_engage/<時間>_<序號>_<怪名>_p<x>x<y>.png`，每場最多 10 張（`_dump_late_engage`，3002）。之後用 `mlevel` 自己的比對函式離線重跑這些圖，就能確認是「沒比對到」、「被高度判定濾掉」還是「錨點不對」。
 
 **判讀 log 時要注意：** 「近距離開打」要分開看。發生在上一下攻擊後 2 秒內的，角色本來就站在原地打怪；只有在走路途中發生的，才是「撞到才打」。混在一起算會一直停在 21–24%，看不出改善。
 
@@ -244,4 +245,4 @@ x 範圍 = player_x ± (reach_x + monster_margin)
 3. **寵物名字蓋住人物名牌：** 目前只能調低 `player_confidence`，或改用不會被蓋住的錨點圖。
 4. **怪物跳得比 55px 還高：** 例如 slime 跳到最高點時在 -56，會被濾掉。可以把 `attack_range_up` 調大，但會付出比對時間。
 5. **上坡：** 站地高度最多落後 0.8 秒，坡度很大時，坡上前方的怪可能晚一點才進框。
-6. **近距離開打的診斷存圖還開著：** 每場最多 10 張 PNG，每張約 1.2MB。問題穩定後應該拿掉或改成預設關閉。
+6. **近距離開打的診斷存圖：** 已改成設定 `late_engage_capture`，預設關閉。開啟時每場最多 10 張 PNG，每張約 1.2MB。
