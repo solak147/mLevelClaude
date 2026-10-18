@@ -217,6 +217,17 @@ x 範圍 = player_x ± (reach_x + monster_margin)
 
 新增欄位都有預設值，舊設定檔可以直接讀。驗證規則在 `_collect()`（`attack_range_up` 不可為負數）。
 
+### 8.1 隨版本更新覆蓋使用者設定（`upgrade_config_file`）
+
+GUI 存檔時會寫入所有欄位，所以改了預設值只會影響新安裝的使用者。要讓既有使用者也套用，請在 `CONFIG_UPGRADES` 登記：
+
+- 設定檔記錄 `config_version`。`load_config()` 讀到比較舊的版本時，套用所有還沒套過的升級，先把原檔備份成 `auto_hunt_config.json.v<舊版本>.bak`，再寫回檔案並記一行 log。
+- **只執行一次**：使用者之後自己改回原本的值，不會再被覆蓋。
+- `config_version` 不在 `DEFAULT_CONFIG` 裡。舊版程式的 `save_config` 會保留它不認得的鍵，所以退回舊版、再升級回來，也不會重複套用。
+- `save_config` 一律寫入目前版本，新安裝的設定檔不會被「升級」。
+- 版本 1（2026-10-18）：`player_confidence` → 0.70、`monster_confidence` → 0.75，不管原本設成多少都直接覆蓋。
+- 之後要新增：加一筆 `2: {...}`，並把 `CONFIG_VERSION` 改成 2。
+
 ---
 
 ## 9. 調整紀錄（2026-10-18）
