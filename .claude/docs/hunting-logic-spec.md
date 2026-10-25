@@ -176,6 +176,7 @@ x 範圍 = player_x ± (reach_x + monster_margin)
 - 冷卻 `attack_cooldown`（0.45 秒）到了才出手：先轉向目標，再按 `attack_key`；MP 不足時改按 `fallback_attack_key`，按住 `attack_hold_seconds`。
 - **準時出手：** 冷卻只在每輪檢查一次，所以舊版的攻擊間隔一定是每輪時間（約 210ms）的整數倍，會在 0.46 和 0.63 秒之間跳動，看起來像偶爾卡一下。現在如果冷卻剩下的時間比一輪短（用每輪時間的移動平均 `frame_ema` 判斷），就在這一輪等到冷卻結束再出手。模擬結果：平均間隔從約 0.58 秒變成 0.45 秒，標準差從 64–87ms 降到 6ms 以內。
 - log：`Attack <怪名> dx=… dy=… key=… range=…x… gap=…ms wait=…ms`。dy 是相對高度中心的值，正常會在 0 附近。gap 是距離上一下攻擊的時間，wait 是這一下為了等冷卻在這一輪多等的時間；兩下相隔超過 2 秒就不印 gap/wait。
+- **擬人化節奏（`humanize_timing`，預設開，`humanize.py`）：** 開啟時冷卻到了之後會多等一段反應時間（`humanize.reaction()`，中位數約 22ms、右偏、最長 120ms），這段也算進 log 的 `wait=`，所以 gap 會在 0.45 秒之上刻意變動，標準差不再是上面的 6ms 以內——這是設計，不是退步。每輪結尾的額外等待也從 `uniform(0, 0.02)` 改成 `reaction()`；按住時間（含 `attack_hold_seconds`）依鍵與節奏在原值附近變動，抓繩、下跳、繩上微調用 `exact=True` 維持實測值。關閉時以上全部還原成舊行為。
 
 ### 6.1 MP 備用攻擊（`_update_attack_mode`，2726）
 
