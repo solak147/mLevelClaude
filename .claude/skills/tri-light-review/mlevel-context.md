@@ -89,8 +89,10 @@ App Check 是否真的阻擋請求，取決於 `functions/.env` 的 `MLEVEL_APPC
 | `ngm_relay.ps1`、`ngm_armed.txt`、`ngm_request.txt` | `%LOCALAPPDATA%\mlevel\`（斷線重連「轉接啟動」，`reconnect.py`） | `ngm_armed.txt` 是「期限（Unix 秒）\n擁有者 PID\n行程名稱」，腳本確認擁有者行程還在、名稱相同才轉交；舊版腳本由 `refresh_relay()` 自動換新。腳本刻意放在程式資料夾外，使用者刪掉 mlevel 後仍照原樣開 NGM |
 | `HKCU\Software\Classes\ngm` | 登錄（轉接啟動） | 只刪自己裝的那一筆（指向 `ngm_relay.ps1` 的），HKLM 原本的設定永遠不動；腳本不見、只剩登錄時，取消勾選也要能刪 |
 
-- 送鍵與節奏的設定鍵：`logitech_input`（預設關，舊用戶升級不會被自動切到羅技驅動）、`logitech_mouse`、`logitech_fallback`、`humanize_timing`，缺欄位用 `DEFAULT_CONFIG` 補。`logi_input.py` 以共用模式（`FILE_SHARE_READ|WRITE`）開啟 LGS 9.02.65 的虛擬裝置；`logitech_fallback` 關閉且驅動用不了時，打怪會暫停，但仍每秒偵測測謊並響警報
+- 送鍵與節奏的設定鍵：`logitech_input`（`DEFAULT_CONFIG` 預設開，`be9dbbe` 改回；`logitech_fallback` 也預設開，所以沒有 LGS 驅動的電腦會改用 SendInput）、`logitech_mouse`、`logitech_fallback`、`humanize_timing`，缺欄位用 `DEFAULT_CONFIG` 補。`logi_input.py` 以共用模式（`FILE_SHARE_READ|WRITE`）開啟 LGS 9.02.65 的虛擬裝置；`logitech_fallback` 關閉且驅動用不了時，打怪會暫停，但仍每秒偵測測謊並響警報
 - 斷線重連的設定鍵：`disconnect_watch_enabled`、`disconnect_alarm`、`reconnect_*`（含 `reconnect_images` 每一步的圖），預設全關，缺欄位用 `DEFAULT_CONFIG` 補、`normalize_reconnect_images` 容許舊格式
+- 顯示縮放換算的設定鍵：`ui_ref_scale`（截圖時的 Windows 縮放 %，有效範圍 100~500）。`DEFAULT_CONFIG` 是 0＝還不知道，舊設定檔第一次按「開始」時記下當下縮放，行為和以前完全一樣；出貨的 `config/auto_hunt_config.json` 填 100，因為出貨的怪物圖是 100% 截的。不是 0 且和視窗縮放不同時，`grab()` 會把畫面縮回這個比例（`View`），點擊再換算回螢幕
+- 楓星測謊的設定鍵：`star_detector_enabled`、`star_detector_alarm`、`star_detector_capture`（預設開）、`star_detector_auto_solve`、`star_detector_guess`、`star_detector_stop_hunt`（預設關），只在 `game == "worlds"` 時使用；楓星不再跑經典版的 `minigame` 偵測。存檔在 `log/star_detector/<時間>/`，只留最近 5 局
 - `templates/reconnect/` 裡帶時間戳的圖（`{步驟}_{mmdd_HHMMSS}.png`）是刻意出貨的範例截圖，使用者要換成自己的帳號、伺服器、頻道、角色
 
 - `config_file()`（`mlevel.py:85`）會把舊版放在根目錄的設定檔自動搬進 `config/`，這段遷移邏輯不可移除

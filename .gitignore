@@ -1,2 +1,6 @@
 mlevel/
 mlevelweb/
+
+# 測謊調校用的固定樣本（數百 MB 的截圖），只把說明放進版控
+minigame_samples/*
+!minigame_samples/說明.md
