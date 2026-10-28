@@ -10,7 +10,7 @@
       不可用 `Path(__file__)`，打包後它指向會被清掉的暫存資料夾 — 🔴
 - [ ] 新增的資料夾有同步加到 `mlevel.spec` 的 `data_dirs` 與 `build.ps1` 的 `$dataDirs` — 🔴
 - [ ] 在既有資料夾（`templates/`、`monster/`、`maps/`、`config/`）**修改**既有檔案，或在 `config/` 新增檔案時，要手動同步到
-      `dist\mlevel\<資料夾>`：`build.ps1:139-158` 只在 dist 裡沒有該資料夾時才整個複製；資料夾已存在時，
+      `dist\mlevel\<資料夾>`：`build.ps1`（「第一次打包…才從專案複製一份預設的過去」那段）只在 dist 裡沒有該資料夾時才整個複製；資料夾已存在時，
       `maps/`、`monster/`、`templates/` 只補 dist 缺的新檔、不覆蓋已有的檔案，`config/` 完全不補 — 🔴
 - [ ] Tkinter 元件只在主執行緒操作（包括 `after()` 本身）。背景執行緒只把結果放進 `queue.Queue`，
       主執行緒用 `after()` 定時取出（`license_gate.py:644-657` 的 `_work`／`_poll` 做法）— 🔴/🟡

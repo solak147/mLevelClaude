@@ -145,8 +145,8 @@ description: 以資深自動化腳本／輔助程式／外掛工程師的角度�
 - 與本次變更互相作用（例如新程式呼叫了有 bug 的舊函式、變更讓舊問題變得會觸發）→ 照常列入三燈
 - 與本次變更無關 → 不列入三燈與計數，最多在報告末尾「範圍外觀察」簡短列出（只列 🔴 等級的問題，一行一則）
 
-**設定檔數值變更**：`mlevel/config/*.json` 會在程式執行時被改寫（例如 `attack_range_x`、`rope_memory` 的數值）。只改數值、不動結構的差異不當成程式錯誤，但要注意：完整安裝包 `mlevel-<ver>.zip` 會帶上 `dist\mlevel\config`（`build.ps1:172`，只去掉 `*.bak` 與 `visual_trigger_settings.json`，`build.ps1:174-175`），
-而 `dist\mlevel\config` 第一次打包時是從專案的 `config/` 複製過去的（`build.ps1:139-149`）。自動更新包 `mlevel-<ver>-update.zip` 不含 `config/`（`build.ps1:183-199`）。所以要確認：
+**設定檔數值變更**：`mlevel/config/*.json` 會在程式執行時被改寫（例如 `attack_range_x`、`rope_memory` 的數值）。只改數值、不動結構的差異不當成程式錯誤，但要注意：完整安裝包 `mlevel-<ver>.zip` 會帶上 `dist\mlevel\config`（`build.ps1` 的 `$Zip` 段把 `$distApp` 整個複製進去，只去掉 `*.bak` 與 `visual_trigger_settings.json`；楓星版 `dist\star\mlevel` 另外清空 `config/`、`maps/`），
+而 `dist\mlevel\config` 第一次打包時是從專案的 `config/` 複製過去的（`build.ps1`「第一次打包…才從專案複製一份預設的過去」那段）。自動更新包 `mlevel-<ver>-update.zip` 不含 `config/`（`build.ps1`「自動更新包」那段）。所以要確認：
 - 這些數值是否適合當成新使用者的預設值（開發者自己的路線、繩索記憶不應該出貨）
 - 舊用戶解壓新版 zip 時，會不會覆蓋他們自己的設定
 

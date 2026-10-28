@@ -13,6 +13,21 @@
 | 販售網頁 | `mlevelweb/` | Vue 3 + Vite，Firebase Hosting | 購買、查詢訂單、找回授權、下載程式。`src/lib/ecpay.js` 呼叫後端 |
 | 後端 Functions | `mlevelweb/functions/` | Node 22，firebase-functions v2，region `asia-east1` | 單一 HTTP function `ecpayApi`（`index.js`）處理綠界金流、發放金鑰、授權驗證、席位租約、下載。`ecpay.js` 簽章、`license.js` 金鑰格式 |
 
+## 兩個版本（edition）分開販售
+
+程式分成經典版（`classic`，新楓之谷：經典版）與楓星版（`worlds`，MapleStory Worlds），各自打包、各自一個網站，共用同一支 `ecpayApi`、同一個 Firestore 與綠界商店。一組金鑰只屬於一個版本。
+
+- 訂單、續訂訂單、席位文件都有 `edition` 欄位；**沒有這個欄位就是 `classic`**（`editionOf`）。request 沒帶 `edition` 也是 `classic`（`parseEdition`），所以舊網頁、舊版程式（1.2.0 以前的合併版）的行為不變
+- PC 端：`mlevel/edition.py`；`build.ps1 -Edition worlds` 產生 `_edition_build.py`（不進版控、打包完刪除）。楓星版產出在 `dist\star\`，設定沿用 `config/star/`、`maps/star/`，授權快取在 `%LOCALAPPDATA%\mlevel\star\`，沒有斷線重連
+- 網頁：`npm run build:worlds`（`vite build --mode worlds`）→ `dist-worlds/`，首頁換成 `index.worlds.html`、靜態檔用 `public-worlds/`；Hosting target `classic`（`mlevel-f575a`）／`worlds`（`mlevel-worlds`）
+- Storage：楓星版的安裝檔與手冊在 `star/mlevel.zip`、`star/使用手冊.md`，自動更新在 `releases/star/`
+- 1.2.0 合併版不強制更新（業主決定）：拿經典版金鑰的人仍能在舊版裡切到楓星
+- `/verify`（不佔席位的舊版程式，全是經典版）遇到楓星版金鑰回 `403 {ok:true, valid:false, reason:'EDITION_MISMATCH'}`
+- 楓星網站的導回網域 `mlevel-worlds.web.app` 寫死在 `sanitizeRedirectBaseUrl`；Hosting 站 ID 改了要一起改（還有 `license_gate.py` 的 `SITE_URLS`、`src/lib/product.js`、`vite.config.js`、`.firebaserc`、`index.worlds.html`、`public-worlds/robots.txt`）
+- `firebase.json` 的 hosting 是兩個 target，**CSP 等安全標頭各有一份，改的時候兩份要一起改**
+- 楓星版藏起斷線重連分頁，但 `_apply` 照樣呼叫 `reconnect.refresh_relay()`：從合併版帶來的「轉接啟動」會繼續有效，楓星版裡卻沒有勾選框可以取消，要用經典版取消或刪 `HKCU\Software\Classes\ngm`（楓星版使用手冊要寫）
+- 打包：`mlevel.spec` 在 `_edition_build.py` 存在時把它列進 `hiddenimports`，`build.ps1` 打包後檢查 `build\<edition>\mlevel\PYZ-00.toc`，版本檔有沒有包進去不對就中止
+
 ## 跨專案契約（不可破壞）
 
 ### 1. 後端 API：`https://asia-east1-mlevel-f575a.cloudfunctions.net/ecpayApi`
@@ -20,21 +35,21 @@
 | 路由 | 呼叫者 | App Check | 備註 |
 |------|--------|:---:|------|
 | `GET /` | 健康檢查 | | |
-| `POST /create` | 網頁 | ✔ | 建立訂單、回傳綠界表單欄位 |
+| `POST /create` | 網頁 | ✔ | 建立訂單、回傳綠界表單欄位。選填 `edition`（`classic`／`worlds`，沒帶是 classic），價格與品名依版本 |
 | `POST /notify` | **綠界伺服器**（ReturnURL） | | 必須驗 CheckMacValue，成功回純文字 `1\|OK`，失敗 `0\|...` |
 | `GET/POST /result` | **綠界導回瀏覽器**（OrderResultURL） | | |
-| `GET /order` | 網頁 | ✔ | |
-| `POST /lookup` | 網頁 | ✔ | 找回授權 |
-| `POST /renew` | 網頁 | ✔ | 續訂：body `email, licenseKey`，回傳格式同 `/create` 另加 `currentExpiresAt`。續訂訂單 `orderType: 'renewal'`、`licenseKey` 必須是空字串（金鑰存 `renewsLicenseKey`），付款後由 `applyRenewal` 延長**原始訂單**的 `licenseExpiresAt` |
+| `GET /order` | 網頁 | ✔ | 回應的 `order` 含 `edition`（`classic`／`worlds`，舊訂單 classic） |
+| `POST /lookup` | 網頁 | ✔ | 找回授權；回應的 `order` 含 `edition` |
+| `POST /renew` | 網頁 | ✔ | 續訂：body `email, licenseKey`（選填 `edition`，和原始訂單的版本不同回 `409 reason:'EDITION_MISMATCH'`），回傳格式同 `/create` 另加 `currentExpiresAt`。續訂訂單 `orderType: 'renewal'`、`licenseKey` 必須是空字串（金鑰存 `renewsLicenseKey`），付款後由 `applyRenewal` 延長**原始訂單**的 `licenseExpiresAt` |
 | `POST /verify` | **舊版 PC 腳本**的啟動檢查（`index.js:58`），不佔席位 | | 不可移除或改回應格式；唯一例外是業主啟用 `MLEVEL_REQUIRE_SESSION=true`，讓它回 `426 UPGRADE_REQUIRED`（見 SKILL.md「有規劃的淘汰」） |
-| `POST /session/acquire` | PC 腳本 | | body：`licenseKey, deviceId, deviceLabel, force` |
+| `POST /session/acquire` | PC 腳本 | | body：`licenseKey, deviceId, deviceLabel, force`，選填 `edition`（沒帶是 classic）。和金鑰的版本不同回 `403 {ok:true, valid:false, reason:'EDITION_MISMATCH', edition, error}`；成功時席位記 `edition` |
 | `POST /session/heartbeat` | PC 腳本 | | body：`licenseKey, sessionId`；409 = 席位被搶 |
 | `POST /session/release` | PC 腳本 | | 失敗被用戶端忽略 |
-| `POST /update/check` | PC 腳本（1.0.0 起，自動更新） | | body：`licenseKey, sessionId, version`；要有成立中的租約（`checkSessionLease`，和心跳同一套）。**刻意不回 `valid`**：用戶端以 `require_valid=False` 呼叫、看 `ok` 判斷，不會把付費用戶誤判成無效 |
-| `POST /update/download` | PC 腳本（1.0.0 起） | | body：`licenseKey, sessionId`；回 Storage 短效網址與 `sha256`。同樣不回 `valid` |
+| `POST /update/check` | PC 腳本（1.0.0 起，自動更新） | | body：`licenseKey, sessionId, version`；依席位的 `edition` 讀 `releases/latest.json` 或 `releases/star/latest.json`；要有成立中的租約（`checkSessionLease`，和心跳同一套）。**刻意不回 `valid`**：用戶端以 `require_valid=False` 呼叫、看 `ok` 判斷，不會把付費用戶誤判成無效 |
+| `POST /update/download` | PC 腳本（1.0.0 起） | | body：`licenseKey, sessionId`；回 Storage 短效網址與 `sha256`，更新檔依席位的 `edition` 從 `releases/` 或 `releases/star/` 拿。同樣不回 `valid` |
 | `POST /payment-info` | **綠界伺服器**（超商代碼 PaymentInfoURL） | | 驗章後存繳費代碼（`RtnCode=10100073` 是取號成功，不是失敗）；回純文字 `1\|OK`，驗章失敗 `0\|...`。訂單仍 pending，金鑰等 `/notify` 才發 |
 | `GET/POST /payment-info/return` | **綠界導回瀏覽器**（超商代碼 ClientRedirectURL） | | 同上存繳費代碼，導回 `/?orderId&status=cvs_pending&token`；驗章沒過不給 token |
-| `GET/HEAD /download` | 網頁（`/order`、`/lookup` 回傳的 `downloadUrl`、`manualUrl`） | | query：`orderId, token, file`（`app`／`manual`） |
+| `GET/HEAD /download` | 網頁（`/order`、`/lookup` 回傳的 `downloadUrl`、`manualUrl`） | | query：`orderId, token, file`（`app`／`manual`）；依金鑰（原始訂單）的 `edition` 給 `mlevel.zip` 或 `star/mlevel.zip`。`MLEVEL_DOWNLOAD_URL` 退路只給經典版 |
 
 App Check 是否真的阻擋請求，取決於 `functions/.env` 的 `MLEVEL_APPCHECK_ENFORCE`（`index.js:262`）；未開啟時只記 log。評估「繞過網頁直接打 API」的風險時要考慮這點。
 
@@ -60,12 +75,12 @@ App Check 是否真的阻擋請求，取決於 `functions/.env` 的 `MLEVEL_APPC
 - 金額必須比對訂單記錄（縱深防禦）
 - 正式 HashKey、HashIV、MerchantID 不可寫死、不可記入日誌，必須從 `functions/.env` 讀取
 - `ecpay.js` 內建的綠界公開測試金鑰是刻意保留的；只有在 `ECPAY_ALLOW_PUBLIC_TEST_CREDENTIALS=true` 且結帳網址是 `payment-stage` 時才可使用。這道保護不可移除或放寬（否則漏帶 .env 時，任何人都能偽造 /notify 拿到金鑰）
-- `firebase.json` CSP 的 `form-action` 與 `connect-src` 綁著綠界與 Functions 網域；改網域要同步改 CSP
+- `firebase.json` CSP 的 `form-action` 與 `connect-src` 綁著綠界與 Functions 網域；改網域要同步改 CSP（兩個 hosting target 都要改）
 
 ### 售價
 
-- 後端 `PRODUCT` 售價（`index.js` 的 `PRODUCT`）是權威價格，`/create` 不採用前端傳入的金額
-- 前端 `HeroSection.vue`、`CheckoutModal.vue` 顯示的價格必須同步修改，否則使用者看到的價格和實際扣款不同
+- 後端售價（`index.js` 的 `EDITIONS[edition].product`，`PRODUCT` 是經典版那一份）是權威價格，`/create` 不採用前端傳入的金額
+- 前端 `src/lib/product.js` 的 `PRICE`（`HeroSection.vue`、`CheckoutModal.vue`、`RenewModal.vue` 都讀它）必須同步修改，否則使用者看到的價格和實際扣款不同
 
 ### 4. Firestore
 
@@ -85,7 +100,7 @@ App Check 是否真的阻擋請求，取決於 `functions/.env` 的 `MLEVEL_APPC
 | `auto_hunt_config.json` | 打包版：`<exe 所在資料夾>\config\`（`mlevel.py:51`）；原始碼版：`mlevel/config/` | 使用者設定；新增欄位要有預設值，讀到舊版檔案不可報錯 |
 | `routes.json` | 同上 | 有 `ROUTE_FILE_VERSION`（目前 3）；格式變更要遞增版本並提供舊版遷移 |
 | `rope_memory.json` | 同上 | 同上：缺欄位用預設值、無法解析時不可崩潰 |
-| `visual_trigger_settings.json` | 舊程式 `desktop_visual_trigger.py` 專用，不出貨（`build.ps1:175`） | 不屬於產品契約 |
+| `visual_trigger_settings.json` | 舊程式 `desktop_visual_trigger.py` 專用，不出貨（`build.ps1` 的 `$Zip` 段刪掉它） | 不屬於產品契約 |
 | `ngm_relay.ps1`、`ngm_armed.txt`、`ngm_request.txt` | `%LOCALAPPDATA%\mlevel\`（斷線重連「轉接啟動」，`reconnect.py`） | `ngm_armed.txt` 是「期限（Unix 秒）\n擁有者 PID\n行程名稱」，腳本確認擁有者行程還在、名稱相同才轉交；舊版腳本由 `refresh_relay()` 自動換新。腳本刻意放在程式資料夾外，使用者刪掉 mlevel 後仍照原樣開 NGM |
 | `HKCU\Software\Classes\ngm` | 登錄（轉接啟動） | 只刪自己裝的那一筆（指向 `ngm_relay.ps1` 的），HKLM 原本的設定永遠不動；腳本不見、只剩登錄時，取消勾選也要能刪 |
 
@@ -98,7 +113,7 @@ App Check 是否真的阻擋請求，取決於 `functions/.env` 的 `MLEVEL_APPC
 - `config_file()`（`mlevel.py:85`）會把舊版放在根目錄的設定檔自動搬進 `config/`，這段遷移邏輯不可移除
 - 打包版啟動時會 `os.chdir` 到 exe 所在資料夾，設定裡的模板路徑是相對路徑
 - `templates/`、`maps/`、`monster/` 等資源檔的路徑直接寫在使用者設定裡（例如 `monster/blue-snail.png`），不可改名或搬移
-- **更新流程**：完整安裝包 `mlevel-<ver>.zip` 內含 `config/`（`build.ps1:172`，只去掉 `*.bak` 與 `visual_trigger_settings.json`，`build.ps1:174-175`），舊用戶手動解壓覆蓋會蓋掉自己的設定與路線。任何調整打包內容的變更，都要確認不會覆蓋使用者既有的 `config/`、`maps/`；使用手冊目前沒有更新步驟，需確認
+- **更新流程**：完整安裝包 `mlevel-<ver>.zip` 內含 `config/`（`build.ps1` 的 `$Zip` 段把 `$distApp` 整個複製進去，只去掉 `*.bak` 與 `visual_trigger_settings.json`；楓星版另外清空 `config/`、`maps/`），舊用戶手動解壓覆蓋會蓋掉自己的設定與路線。任何調整打包內容的變更，都要確認不會覆蓋使用者既有的 `config/`、`maps/`；使用手冊目前沒有更新步驟，需確認
 - **自動更新（1.0.0 起）**：更新包 `mlevel-<ver>-update.zip` 只含 `mlevel.exe`、`_internal`、`mlevel-updater.exe` 與 `defaults/`（monster、templates；maps 不放，地圖清單在 routes.json，補圖沒用）。
   `updater.py` 只用 `defaults/` 補使用者缺的檔案，不覆蓋；`config/`、`log/` 永遠不碰。改更新包格式時，要確認已裝 1.0.0 的 updater 還能處理新的包（updater 是跟著舊版一起出貨、由舊版啟動的）
 
